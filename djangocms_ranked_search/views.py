@@ -78,9 +78,38 @@ def _jaccard(query: str, title: str) -> float:
 
 
 class CMSWeightedSearchView(AldrynSearchView):
+    """
+    A search view that performs in-memory re-ranking of results.
+
+    This view overrides the default pagination behavior to fetch a larger pool
+    of initial results from the search backend. It then re-ranks these results
+    using a scoring algorithm that prioritizes exact title matches and token
+    similarity (Jaccard index) before falling back to the backend score.
+    """
+
     form_class = CMSWeightedSearchForm
 
     def paginate_queryset(self, queryset, page_size):
+        """
+        Re-ranks a queryset in memory and returns a single page of results.
+
+        This method fetches a configurable pool of results (defined by
+        `RERANK_POOL`) from the initial queryset. It then sorts these items
+        based on a multi-tiered algorithm:
+        1.  Exact match between the normalized query and normalized title.
+        2.  Jaccard similarity score between query and title tokens.
+        3.  The original score from the search backend (descending).
+        4.  The number of tokens in the title (ascending, to favor brevity).
+        5.  The normalized title itself (for deterministic ordering).
+
+        Args:
+            queryset (SearchQuerySet): The initial queryset from Haystack.
+            page_size (int): The number of items to display per page.
+
+        Returns:
+            tuple: A tuple with (paginator, page, object_list, has_other_pages)
+                as expected by AldrynSearchView.
+        """
         raw_q = self.request.GET.get("q", "")
         ceiling = getattr(settings, "RERANK_CEILING", 1000)
         # Control the amount of results processed for reranking

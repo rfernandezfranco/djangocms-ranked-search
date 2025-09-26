@@ -9,6 +9,16 @@ from .utils import get_base_language, normalize_text
 
 
 class CMSTitleRankedIndex(get_index_base()):
+    """
+    A Haystack `SearchIndex` for django CMS `Title` objects.
+
+    This index is responsible for preparing and defining the searchable data
+    associated with a CMS page title. It creates standard fields like `title`,
+    `body`, and `tags`, and also adds normalized, accent-insensitive variants
+    (e.g., `title_norm`, `body_norm`) to improve search quality with custom
+    backends.
+    """
+
     haystack_use_for_indexing = True
     index_title = True
 
@@ -51,12 +61,19 @@ class CMSTitleRankedIndex(get_index_base()):
         )
 
     def get_url(self, obj):
+        """Return the absolute URL for the page associated with the Title."""
         try:
             return obj.page.get_absolute_url(language=obj.language)
         except Exception:
             return obj.page.get_absolute_url()
 
     def prepare_title(self, obj):
+        """
+        Prepare the title field by finding the best available title.
+
+        It tries to get the title from the title object itself, then falls
+        back to the page's page title, menu title, or slug.
+        """
         return (
             (obj.title or "").strip()
             or getattr(
@@ -83,7 +100,22 @@ class CMSTitleRankedIndex(get_index_base()):
         )
 
     def get_search_data(self, title_obj, language, request):
-        """Return plain text content combined from page plugins."""
+        """
+        Aggregate all searchable text content from a page's plugins.
+
+        This method iterates through all placeholders and plugins on a page,
+        extracting text content using `get_plugin_index_data`. It also
+        inspects common field names (e.g., `body`, `text`, `caption`) on
+        plugin instances as a fallback.
+
+        Args:
+            title_obj (Title): The CMS Title object being indexed.
+            language (str): The active language.
+            request: The current request object.
+
+        Returns:
+            str: A single string containing all extracted plain text.
+        """
         bits = []
         page = title_obj.page
 
@@ -131,6 +163,7 @@ class CMSTitleRankedIndex(get_index_base()):
         return doc
 
     def prepare_tags(self, obj):
+        """Extract and combine tags from the page or title extension."""
         try:
             return " ".join(t.name for t in obj.page.tags.all())
         except Exception:
@@ -149,6 +182,15 @@ class CMSTitleRankedIndex(get_index_base()):
         return ""
 
     def prepare_fields(self, title_obj, language, request):
+        """
+        Prepare all fields for indexing, including raw and normalized versions.
+
+        This method populates the `prepared_data` dictionary, which is used by
+        Haystack to build the search index document. It sets the standard
+        fields (`title`, `tags`, `body`, `url`) and also generates the
+        normalized, accent-folded versions (`title_norm`, `tags_norm`,
+        `body_norm`) for use by custom search backends.
+        """
         super().prepare_fields(title_obj, language, request)
         # Preserve raw values for display and analyzers with custom folding
         self.prepared_data["title"] = self.prepare_title(title_obj)

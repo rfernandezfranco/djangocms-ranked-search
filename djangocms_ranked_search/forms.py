@@ -37,7 +37,32 @@ def _use_normalized_fields() -> bool:
 
 
 class CMSWeightedSearchForm(SearchForm):
+    """
+    A search form that builds a weighted query to boost exact title matches.
+
+    This form enhances the standard Haystack `SearchForm` by constructing a
+    query that gives significant weight to exact matches in the title field.
+    It also supports searching against normalized fields for accent-insensitive
+    matching when available.
+    """
+
     def search(self):
+        """
+        Constructs a weighted search query based on the user's input.
+
+        The method gives the highest priority to exact title matches, followed
+        by term matches in the title. It combines these with a broader search
+        across multiple fields (content, tags, body).
+
+        If normalized fields are in use (e.g., with the Xapian backend), the
+        query is built against fields like `title_norm` and `content_norm`.
+        Otherwise, it falls back to the original fields.
+
+        Returns:
+            SearchQuerySet: A Haystack SearchQuerySet filtered with the
+                            weighted query, or an empty set if the query
+                            is invalid.
+        """
         if not self.is_valid() or not self.cleaned_data.get("q"):
             return self.no_query_found()
 
