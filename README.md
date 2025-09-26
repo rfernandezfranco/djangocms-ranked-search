@@ -17,7 +17,7 @@ Install these dependencies in your django CMS project:
 - `Django>=3.2`
 - `django-cms>=3.11`
 - `django-haystack>=3.2`
-- `aldryn-search>=2.0`
+- `aldryn-search>=1.1.0`
 - `Whoosh>=2.7`
 
 Optional (only if you plan to use Xapian):
